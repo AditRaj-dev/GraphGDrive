@@ -1,27 +1,7 @@
-import { useState } from 'react'
-import './App.css'
-
-function App(): JSX.Element {
-  const [count, setCount] = useState<number>(0)
-
+export default function App() {
   return (
-    <>
-      <div>
-        <h1>Graph Drive</h1>
-      </div>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="h-full flex items-center justify-center text-gray-700">
+      Graph Drive — bootstrap OK
+    </div>
+  );
 }
-
-export default App
