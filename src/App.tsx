@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import SignIn from "./components/SignIn";
 import Toolbar from "./components/Toolbar";
 import GraphCanvas from "./components/GraphCanvas";
+import PreviewPane from "./components/preview/PreviewPane";
 import { useStore } from "./store/useStore";
 import { useDriveTree } from "./hooks/useDriveTree";
 
@@ -22,9 +23,7 @@ export default function App() {
           <GraphCanvas />
         </div>
         <aside className="h-full min-h-0 border-l border-stone-200 bg-white flex flex-col">
-          <div className="flex-1 min-h-0 p-4 overflow-auto text-sm text-stone-500">
-            Preview pane — select a file
-          </div>
+          <PreviewPane />
         </aside>
       </div>
     </div>
