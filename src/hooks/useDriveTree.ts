@@ -6,6 +6,7 @@ import { useStore } from "../store/useStore";
 export function useDriveTree() {
   const token = useStore((s) => s.token);
   const tree = useStore((s) => s.tree);
+  const expanded = useStore((s) => s.expanded);
   const setTree = useStore((s) => s.setTree);
   const expand = useStore((s) => s.expand);
 
@@ -39,8 +40,8 @@ export function useDriveTree() {
       const node = useStore.getState().tree[id];
       if (!node) continue;
       const isFolder = node.file.mimeType === "application/vnd.google-apps.folder";
-      if (isFolder && !node.loaded) {
-        await loadChildren(id);
+      if (isFolder) {
+        if (!node.loaded) await loadChildren(id);
         expand(id);
       }
       queue.push(...(useStore.getState().tree[id]?.childIds ?? []));
@@ -48,7 +49,6 @@ export function useDriveTree() {
   }, [ensureRoot, expand, loadChildren, token]);
 
   const visibleIds = useMemo(() => {
-    const expanded = useStore.getState().expanded;
     if (!tree[ROOT_ID]) return [];
     const out: string[] = [ROOT_ID];
     const walk = (id: string) => {
@@ -64,7 +64,7 @@ export function useDriveTree() {
     };
     walk(ROOT_ID);
     return out;
-  }, [tree]);
+  }, [tree, expanded]);
 
   return { ensureRoot, loadChildren, expandAll, visibleIds };
 }

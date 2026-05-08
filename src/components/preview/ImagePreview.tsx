@@ -8,19 +8,28 @@ export default function ImagePreview({ fileId, name }: { fileId: string; name: s
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    let url: string | null = null;
     let cancelled = false;
+    let createdUrl: string | null = null;
+    setSrc(null);
+    setErr(null);
     (async () => {
       try {
         const client = createDriveClient(() => token ?? "");
         const blob = await client.fetchBytes(fileId);
-        url = URL.createObjectURL(blob);
-        if (!cancelled) setSrc(url);
+        createdUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setSrc(createdUrl);
+        } else {
+          URL.revokeObjectURL(createdUrl);
+        }
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
       }
     })();
-    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
   }, [fileId, token]);
 
   if (err) return <p className="text-red-600 text-xs">{err}</p>;

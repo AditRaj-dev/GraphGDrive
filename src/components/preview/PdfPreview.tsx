@@ -14,6 +14,7 @@ export default function PdfPreview({ fileId }: { fileId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null;
     setLoading(true);
     setErr(null);
     (async () => {
@@ -22,11 +23,12 @@ export default function PdfPreview({ fileId }: { fileId: string }) {
         const blob = await client.fetchBytes(fileId);
         const buf = await blob.arrayBuffer();
         if (cancelled) return;
-        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
         if (cancelled || !containerRef.current) return;
         containerRef.current.replaceChildren();
-        for (let p = 1; p <= pdf.numPages; p++) {
-          const page = await pdf.getPage(p);
+        for (let p = 1; p <= pdfDoc.numPages; p++) {
+          if (cancelled || !containerRef.current) return;
+          const page = await pdfDoc.getPage(p);
           const viewport = page.getViewport({ scale: 1.2 });
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
@@ -42,7 +44,10 @@ export default function PdfPreview({ fileId }: { fileId: string }) {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      pdfDoc?.destroy();
+    };
   }, [fileId, token]);
 
   if (err) return <p className="text-red-600 text-xs">{err}</p>;
