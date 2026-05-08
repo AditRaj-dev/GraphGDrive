@@ -51,7 +51,7 @@ export default function GraphCanvas() {
         id: ln.id,
         type: "file",
         position: { x: pos.x, y: pos.y },
-        data: { name: node.file.name, kind: categorize(node.file.mimeType), selected: selectedId === ln.id },
+        data: { name: node.file.name, kind: categorize(node.file.mimeType), selected: selectedId === ln.id, thumbnailLink: node.file.thumbnailLink },
       };
     });
 
