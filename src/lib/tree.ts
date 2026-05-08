@@ -21,8 +21,8 @@ export function mergeChildren(map: TreeMap, parentId: string, children: DriveFil
   const newIds: string[] = [];
   for (const child of children) {
     if (!existingIds.has(child.id)) newIds.push(child.id);
-    next[child.id] = next[child.id] ?? { file: child, childIds: [], loaded: false };
-    next[child.id] = { ...next[child.id], file: child };
+    const existing = next[child.id] ?? { file: child, childIds: [] as string[], loaded: false };
+    next[child.id] = { ...existing, file: child };
   }
   next[parentId] = {
     ...next[parentId],
