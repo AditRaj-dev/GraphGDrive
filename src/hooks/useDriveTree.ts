@@ -1,12 +1,13 @@
 import { useCallback, useMemo } from "react";
 import { createDriveClient } from "../lib/drive";
-import { mergeChildren, ROOT_ID } from "../lib/tree";
+import { mergeChildren, mergeSharedDrives, ROOT_ID } from "../lib/tree";
 import { useStore } from "../store/useStore";
 
 export function useDriveTree() {
   const token = useStore((s) => s.token);
   const tree = useStore((s) => s.tree);
   const expanded = useStore((s) => s.expanded);
+  const focusRootId = useStore((s) => s.focusRootId);
   const setTree = useStore((s) => s.setTree);
   const expand = useStore((s) => s.expand);
 
@@ -19,9 +20,25 @@ export function useDriveTree() {
     if (!token) return;
     let pageToken: string | undefined;
     let acc = useStore.getState().tree;
+    const parent = acc[parentId];
+    const driveId = parent?.file.driveId;
+    const apiParentId = parent?.file.virtualKind === "sharedDrive" && driveId ? driveId : parentId;
+    const groupLooseFiles = parentId === ROOT_ID || parent?.file.virtualKind === "sharedDrive";
     do {
-      const res = await client.listChildren(parentId, pageToken);
-      acc = mergeChildren(acc, parentId, res.files);
+      const res = await client.listChildren(apiParentId, pageToken, driveId ? { driveId } : undefined);
+      acc = mergeChildren(acc, parentId, res.files, { groupLooseFiles });
+      pageToken = res.nextPageToken;
+    } while (pageToken);
+    setTree(acc);
+  }, [client, setTree, token]);
+
+  const loadSharedDrives = useCallback(async () => {
+    if (!token) return;
+    let pageToken: string | undefined;
+    let acc = useStore.getState().tree;
+    do {
+      const res = await client.listSharedDrives(pageToken);
+      acc = mergeSharedDrives(acc, res.drives);
       pageToken = res.nextPageToken;
     } while (pageToken);
     setTree(acc);
@@ -29,7 +46,8 @@ export function useDriveTree() {
 
   const ensureRoot = useCallback(async () => {
     if (!useStore.getState().tree[ROOT_ID]?.loaded) await loadChildren(ROOT_ID);
-  }, [loadChildren]);
+    await loadSharedDrives();
+  }, [loadChildren, loadSharedDrives]);
 
   const expandAll = useCallback(async () => {
     if (!token) return;
@@ -49,8 +67,8 @@ export function useDriveTree() {
   }, [ensureRoot, expand, loadChildren, token]);
 
   const visibleIds = useMemo(() => {
-    if (!tree[ROOT_ID]) return [];
-    const out: string[] = [ROOT_ID];
+    if (!tree[focusRootId]) return [];
+    const out: string[] = [focusRootId];
     const walk = (id: string) => {
       const node = tree[id];
       if (!node) return;
@@ -62,9 +80,9 @@ export function useDriveTree() {
         }
       }
     };
-    walk(ROOT_ID);
+    walk(focusRootId);
     return out;
-  }, [tree, expanded]);
+  }, [tree, expanded, focusRootId]);
 
-  return { ensureRoot, loadChildren, expandAll, visibleIds };
+  return { ensureRoot, loadChildren, loadSharedDrives, expandAll, visibleIds };
 }

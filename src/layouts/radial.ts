@@ -1,7 +1,7 @@
 import { stratify, tree as d3tree } from "d3-hierarchy";
 import type { LayoutFn } from "./types";
 
-const RADIUS_PER_DEPTH = 180;
+const RADIUS_PER_DEPTH = 260;
 
 export const radial: LayoutFn = (nodes) => {
   if (nodes.length === 0) return [];
@@ -11,7 +11,7 @@ export const radial: LayoutFn = (nodes) => {
   const maxDepth = Math.max(1, root.height);
   const layout = d3tree<{ id: string; parentId: string | null }>()
     .size([2 * Math.PI, maxDepth * RADIUS_PER_DEPTH])
-    .separation((a, b) => (a.parent === b.parent ? 1 : 2) / Math.max(a.depth, 1));
+    .separation((a, b) => (a.parent === b.parent ? 2 : 3) / Math.max(a.depth, 1));
   layout(root);
   return root.descendants().map((d) => ({
     id: d.data.id,

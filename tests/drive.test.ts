@@ -17,8 +17,23 @@ describe("DriveClient.listChildren", () => {
     expect(url).toContain("files");
     expect(url).toContain("q=%27root%27+in+parents+and+trashed%3Dfalse");
     expect(url).toContain("fields=");
+    expect(url).toContain("includeItemsFromAllDrives=true");
+    expect(url).toContain("supportsAllDrives=true");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer TOKEN");
     expect(res.files[0].id).toBe("x");
+  });
+
+  it("lists shared-drive children with the drive corpus", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ files: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createDriveClient(() => "TOKEN");
+    await client.listChildren("drive-root", undefined, { driveId: "drive-id" });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain("corpora=drive");
+    expect(url).toContain("driveId=drive-id");
   });
 
   it("throws on non-ok response", async () => {
@@ -27,6 +42,21 @@ describe("DriveClient.listChildren", () => {
     }));
     const client = createDriveClient(() => "TOKEN");
     await expect(client.listChildren("root")).rejects.toThrow(/401/);
+  });
+});
+
+describe("DriveClient.listSharedDrives", () => {
+  it("calls drives.list", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ drives: [{ id: "d", name: "Shared" }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createDriveClient(() => "TOKEN");
+    const res = await client.listSharedDrives();
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain("/drives?");
+    expect(res.drives[0].name).toBe("Shared");
   });
 });
 

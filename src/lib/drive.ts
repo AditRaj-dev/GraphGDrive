@@ -1,12 +1,16 @@
-import type { DriveFile } from "../types/drive";
+import type { DriveFile, SharedDrive } from "../types/drive";
 
-const FIELDS = "nextPageToken,files(id,name,mimeType,parents,iconLink,thumbnailLink,modifiedTime,size)";
+const FIELDS = "nextPageToken,files(id,name,mimeType,parents,iconLink,thumbnailLink,modifiedTime,size,driveId)";
+const DRIVE_FIELDS = "nextPageToken,drives(id,name)";
 const BASE = "https://www.googleapis.com/drive/v3";
 
 export type ListResult = { files: DriveFile[]; nextPageToken?: string };
+export type SharedDriveResult = { drives: SharedDrive[]; nextPageToken?: string };
+export type ListOptions = { driveId?: string };
 
 export type DriveClient = {
-  listChildren(parentId: string, pageToken?: string): Promise<ListResult>;
+  listChildren(parentId: string, pageToken?: string, options?: ListOptions): Promise<ListResult>;
+  listSharedDrives(pageToken?: string): Promise<SharedDriveResult>;
   fetchBytes(fileId: string): Promise<Blob>;
   embedUrl(file: DriveFile): string | null;
 };
@@ -15,17 +19,35 @@ export function createDriveClient(getToken: () => string): DriveClient {
   const authHeaders = (): HeadersInit => ({ Authorization: `Bearer ${getToken()}` });
 
   return {
-    async listChildren(parentId, pageToken) {
+    async listChildren(parentId, pageToken, options) {
       const params = new URLSearchParams({
         q: `'${parentId}' in parents and trashed=false`,
         pageSize: "200",
         fields: FIELDS,
         orderBy: "folder,name",
+        includeItemsFromAllDrives: "true",
+        supportsAllDrives: "true",
       });
+      if (options?.driveId) {
+        params.set("corpora", "drive");
+        params.set("driveId", options.driveId);
+      }
       if (pageToken) params.set("pageToken", pageToken);
       const url = `${BASE}/files?${params}`;
       const res = await fetch(url, { headers: authHeaders() });
       if (!res.ok) throw new Error(`Drive list failed: ${res.status} ${await res.text()}`);
+      return res.json();
+    },
+
+    async listSharedDrives(pageToken) {
+      const params = new URLSearchParams({
+        pageSize: "100",
+        fields: DRIVE_FIELDS,
+      });
+      if (pageToken) params.set("pageToken", pageToken);
+      const url = `${BASE}/drives?${params}`;
+      const res = await fetch(url, { headers: authHeaders() });
+      if (!res.ok) throw new Error(`Shared drives list failed: ${res.status} ${await res.text()}`);
       return res.json();
     },
 

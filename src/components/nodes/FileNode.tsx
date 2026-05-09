@@ -27,8 +27,8 @@ export default function FileNode({ data }: { data: unknown }) {
 
   return (
     <div className={[
-      "rounded-md border text-sm shadow-sm bg-white cursor-pointer select-none transition-shadow overflow-hidden",
-      showThumb ? "w-[180px]" : "min-w-[150px] px-3 py-2",
+      "rounded-md border text-sm shadow-sm bg-white cursor-pointer select-none transition-shadow overflow-hidden w-[200px]",
+      showThumb ? "" : "px-3 py-2",
       KIND_COLORS[nodeData.kind],
       nodeData.selected ? "ring-2 ring-blue-500 shadow-md" : "hover:shadow-md",
     ].join(" ")}>

@@ -5,7 +5,7 @@ export type FolderNodeData = { name: string; expanded: boolean; loaded: boolean 
 export default function FolderNode({ data }: { data: unknown }) {
   const nodeData = data as FolderNodeData;
   return (
-    <div className="px-3 py-2 rounded-md bg-amber-50 border border-amber-300 text-sm shadow-sm min-w-[150px] cursor-pointer select-none">
+    <div className="px-3 py-2 rounded-md bg-amber-50 border border-amber-300 text-sm shadow-sm w-[200px] cursor-pointer select-none">
       <Handle type="target" position={Position.Top} className="!bg-amber-400 !border-amber-600" />
       <div className="flex items-center gap-2">
         <svg className="w-4 h-4 shrink-0 text-amber-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
