@@ -3,6 +3,7 @@ import { useDriveTree } from "../hooks/useDriveTree";
 import { revokeAccessToken } from "../lib/auth";
 import { ROOT_ID } from "../lib/tree";
 import type { LayoutKind } from "../layouts/types";
+import DriveSelector from "./DriveSelector";
 
 const KINDS: { value: LayoutKind; label: string }[] = [
   { value: "hierarchical", label: "Tree" },
@@ -13,9 +14,10 @@ const KINDS: { value: LayoutKind; label: string }[] = [
 interface ToolbarProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onShowShortcuts: () => void;
 }
 
-export default function Toolbar({ sidebarOpen, onToggleSidebar }: ToolbarProps) {
+export default function Toolbar({ sidebarOpen, onToggleSidebar, onShowShortcuts }: ToolbarProps) {
   const layout = useStore((s) => s.layout);
   const setLayout = useStore((s) => s.setLayout);
   const token = useStore((s) => s.token);
@@ -36,6 +38,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar }: ToolbarProps) 
   return (
     <header className="h-12 px-4 border-b border-stone-200 bg-white flex items-center gap-4 shrink-0" role="banner">
       <span className="font-mono font-bold text-sm text-stone-900 tracking-tight">graph·drive</span>
+
+      <DriveSelector />
 
       {/* Back to full drive when focused on a subfolder */}
       {isFocused && (
@@ -99,6 +103,15 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar }: ToolbarProps) 
               </>
             )}
           </svg>
+        </button>
+
+        <button
+          onClick={onShowShortcuts}
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+          className="h-7 w-7 flex items-center justify-center rounded bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors font-mono text-xs font-semibold"
+        >
+          ?
         </button>
 
         <button

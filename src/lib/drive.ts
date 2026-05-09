@@ -11,6 +11,7 @@ export type ListOptions = { driveId?: string };
 export type DriveClient = {
   listChildren(parentId: string, pageToken?: string, options?: ListOptions): Promise<ListResult>;
   listSharedDrives(pageToken?: string): Promise<SharedDriveResult>;
+  listSharedFolders(pageToken?: string): Promise<ListResult>;
   fetchBytes(fileId: string): Promise<Blob>;
   embedUrl(file: DriveFile): string | null;
 };
@@ -36,6 +37,19 @@ export function createDriveClient(getToken: () => string): DriveClient {
       const url = `${BASE}/files?${params}`;
       const res = await fetch(url, { headers: authHeaders() });
       if (!res.ok) throw new Error(`Drive list failed: ${res.status} ${await res.text()}`);
+      return res.json();
+    },
+
+    async listSharedFolders(pageToken) {
+      const params = new URLSearchParams({
+        q: "sharedWithMe=true and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        pageSize: "200",
+        fields: FIELDS,
+        orderBy: "name",
+      });
+      if (pageToken) params.set("pageToken", pageToken);
+      const res = await fetch(`${BASE}/files?${params}`, { headers: authHeaders() });
+      if (!res.ok) throw new Error(`Shared folders list failed: ${res.status} ${await res.text()}`);
       return res.json();
     },
 

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { createDriveClient } from "../lib/drive";
-import { mergeChildren, mergeSharedDrives, ROOT_ID } from "../lib/tree";
+import { mergeChildren, mergeSharedDrives, mergeSharedFolders, ROOT_ID } from "../lib/tree";
+import { categorize } from "../lib/mime";
 import { useStore } from "../store/useStore";
 
 export function useDriveTree() {
@@ -8,6 +9,7 @@ export function useDriveTree() {
   const tree = useStore((s) => s.tree);
   const expanded = useStore((s) => s.expanded);
   const focusRootId = useStore((s) => s.focusRootId);
+  const showAllIds = useStore((s) => s.showAllIds);
   const setTree = useStore((s) => s.setTree);
   const expand = useStore((s) => s.expand);
 
@@ -44,10 +46,22 @@ export function useDriveTree() {
     setTree(acc);
   }, [client, setTree, token]);
 
+  const loadSharedFolders = useCallback(async () => {
+    if (!token) return;
+    let pageToken: string | undefined;
+    let acc = useStore.getState().tree;
+    do {
+      const res = await client.listSharedFolders(pageToken);
+      acc = mergeSharedFolders(acc, res.files);
+      pageToken = res.nextPageToken;
+    } while (pageToken);
+    setTree(acc);
+  }, [client, setTree, token]);
+
   const ensureRoot = useCallback(async () => {
     if (!useStore.getState().tree[ROOT_ID]?.loaded) await loadChildren(ROOT_ID);
-    await loadSharedDrives();
-  }, [loadChildren, loadSharedDrives]);
+    await Promise.all([loadSharedDrives(), loadSharedFolders()]);
+  }, [loadChildren, loadSharedDrives, loadSharedFolders]);
 
   const expandAll = useCallback(async () => {
     if (!token) return;
@@ -83,23 +97,45 @@ export function useDriveTree() {
     }
   }, [expand, loadChildren, token]);
 
+  const FOLDER_LIMIT = 20;
+
   const visibleIds = useMemo(() => {
     if (!tree[focusRootId]) return [];
     const out: string[] = [focusRootId];
+
     const walk = (id: string) => {
       const node = tree[id];
       if (!node) return;
-      const isFolder = node.file.mimeType === "application/vnd.google-apps.folder";
-      if (isFolder && expanded.has(id)) {
-        for (const c of node.childIds) {
-          out.push(c);
-          walk(c);
-        }
+      if (node.file.mimeType !== "application/vnd.google-apps.folder") return;
+      if (!expanded.has(id)) return;
+
+      const children = node.childIds;
+      const showAll = showAllIds.has(id);
+
+      // Split into subfolders and files
+      const subfolders = children.filter((c) => tree[c]?.file.mimeType === "application/vnd.google-apps.folder");
+      const files = children.filter((c) => tree[c] && tree[c]!.file.mimeType !== "application/vnd.google-apps.folder");
+
+      // Cap subfolders (files are grouped, so they don't inflate node count)
+      const visibleFolders = showAll ? subfolders : subfolders.slice(0, FOLDER_LIMIT);
+      for (const fid of visibleFolders) { out.push(fid); walk(fid); }
+      if (!showAll && subfolders.length > FOLDER_LIMIT) out.push(`__more__${id}`);
+
+      // Group files by kind → one sentinel per kind, or expand if toggled
+      const byKind = new Map<string, string[]>();
+      for (const fid of files) {
+        const kind = categorize(tree[fid]!.file.mimeType);
+        if (!byKind.has(kind)) byKind.set(kind, []);
+        byKind.get(kind)!.push(fid);
+      }
+      for (const [kind] of byKind) {
+        out.push(`__grp__${id}__${kind}`);
       }
     };
+
     walk(focusRootId);
     return out;
-  }, [tree, expanded, focusRootId]);
+  }, [tree, expanded, focusRootId, showAllIds]);
 
   return { ensureRoot, loadChildren, loadSharedDrives, expandAll, expandSubtree, visibleIds };
 }

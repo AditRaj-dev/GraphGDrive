@@ -32,7 +32,7 @@ export default function FileNode({ data }: { data: unknown }) {
       KIND_COLORS[nodeData.kind],
       nodeData.selected ? "ring-2 ring-blue-500 shadow-md" : "hover:shadow-md",
     ].join(" ")}>
-      <Handle type="target" position={Position.Top} className="!bg-stone-400" />
+      <Handle type="target" position={Position.Left} className="!bg-stone-400" />
 
       {/* Thumbnail */}
       {showThumb && (

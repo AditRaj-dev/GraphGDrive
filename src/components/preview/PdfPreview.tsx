@@ -26,10 +26,13 @@ export default function PdfPreview({ fileId }: { fileId: string }) {
         pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
         if (cancelled || !containerRef.current) return;
         containerRef.current.replaceChildren();
+        const containerW = containerRef.current.clientWidth;
         for (let p = 1; p <= pdfDoc.numPages; p++) {
           if (cancelled || !containerRef.current) return;
           const page = await pdfDoc.getPage(p);
-          const viewport = page.getViewport({ scale: 1.2 });
+          const naturalW = page.getViewport({ scale: 1 }).width;
+          const scale = containerW > 0 ? containerW / naturalW : 1;
+          const viewport = page.getViewport({ scale });
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
@@ -50,11 +53,11 @@ export default function PdfPreview({ fileId }: { fileId: string }) {
     };
   }, [fileId, token]);
 
-  if (err) return <p className="text-red-600 text-xs">{err}</p>;
   return (
-    <div className="h-full relative overflow-auto">
-      {loading && <p className="text-stone-400 text-xs animate-pulse p-4">Loading PDF…</p>}
-      <div ref={containerRef} className="p-2" />
+    <div className="p-2 w-full">
+      {loading && <p className="text-stone-400 text-xs animate-pulse mb-2">Loading PDF…</p>}
+      {err && <p className="text-red-600 text-xs">{err}</p>}
+      <div ref={containerRef} />
     </div>
   );
 }

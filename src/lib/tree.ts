@@ -2,6 +2,7 @@ import type { DriveFile, SharedDrive, TreeNode } from "../types/drive";
 
 export const ROOT_ID = "root";
 export const SHARED_DRIVES_ID = "__shared_drives__";
+export const SHARED_WITH_ME_ID = "__shared_with_me__";
 export const looseFilesId = (parentId: string) => `${parentId}::__loose_files__`;
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -112,6 +113,32 @@ export function mergeSharedDrives(map: TreeMap, drives: SharedDrive[]): TreeMap 
     loaded: true,
     parentId: ROOT_ID,
   };
+  return next;
+}
+
+export function mergeSharedFolders(map: TreeMap, folders: DriveFile[]): TreeMap {
+  const next: TreeMap = { ...map };
+  if (!next[ROOT_ID]) next[ROOT_ID] = rootNode();
+
+  const existing = next[SHARED_WITH_ME_ID] ?? {
+    file: { id: SHARED_WITH_ME_ID, name: "Shared with me", mimeType: FOLDER_MIME, virtualKind: "sharedDrives" as const },
+    childIds: [] as string[],
+    loaded: true,
+    parentId: null,
+  };
+  const existingIds = new Set(existing.childIds);
+  const newIds: string[] = [];
+
+  for (const folder of folders) {
+    if (!existingIds.has(folder.id)) newIds.push(folder.id);
+    next[folder.id] = {
+      ...(next[folder.id] ?? { childIds: [] as string[], loaded: false }),
+      file: folder,
+      parentId: SHARED_WITH_ME_ID,
+    };
+  }
+
+  next[SHARED_WITH_ME_ID] = { ...existing, childIds: [...existing.childIds, ...newIds], loaded: true };
   return next;
 }
 

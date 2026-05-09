@@ -7,7 +7,9 @@ const DEFAULT_H = 52;
 export const hierarchical: LayoutFn = (nodes) => {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 48, ranksep: 80 });
+  // LR = left-to-right: depth is the horizontal axis, siblings stack vertically.
+  // This lets users scan files by scrolling up/down instead of scrolling left/right.
+  g.setGraph({ rankdir: "LR", nodesep: 12, ranksep: 80 });
   for (const n of nodes) {
     g.setNode(n.id, { width: n.width ?? DEFAULT_W, height: n.height ?? DEFAULT_H });
   }
