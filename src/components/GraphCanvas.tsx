@@ -24,7 +24,7 @@ export default function GraphCanvas() {
   const toggleExpand = useStore((s) => s.toggleExpand);
   const setFocusRoot = useStore((s) => s.setFocusRoot);
   const expand = useStore((s) => s.expand);
-  const { loadChildren, expandAll, visibleIds } = useDriveTree();
+  const { loadChildren, expandSubtree, visibleIds } = useDriveTree();
 
   const { nodes, edges } = useMemo(() => {
     // Build parent map from tree childIds so virtual nodes get correct parents
@@ -93,22 +93,25 @@ export default function GraphCanvas() {
     if (!tn) return;
     if (isFolderMime(tn.file.mimeType)) {
       if (event.shiftKey && event.altKey) {
-        setFocusRoot(ROOT_ID);
-        expand(ROOT_ID);
-        await expandAll();
+        // Alt+Shift+click: focus this folder and deep-expand its entire subtree
+        setFocusRoot(tn.file.id);
+        await expandSubtree(tn.file.id);
         return;
       }
-      if (!tn.loaded) await loadChildren(tn.file.id);
       if (event.shiftKey) {
+        // Shift+click: focus this folder (zoom in), expand one level
+        if (!tn.loaded) await loadChildren(tn.file.id);
         setFocusRoot(tn.file.id);
         expand(tn.file.id);
         return;
       }
+      // Plain click: toggle expand
+      if (!tn.loaded) await loadChildren(tn.file.id);
       toggleExpand(tn.file.id);
     } else {
       select(tn.file.id);
     }
-  }, [expand, expandAll, loadChildren, select, setFocusRoot, toggleExpand]);
+  }, [expand, expandSubtree, loadChildren, select, setFocusRoot, toggleExpand]);
 
   return (
     <div className="h-full w-full">

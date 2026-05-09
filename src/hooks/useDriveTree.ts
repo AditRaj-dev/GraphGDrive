@@ -66,6 +66,23 @@ export function useDriveTree() {
     }
   }, [ensureRoot, expand, loadChildren, token]);
 
+  // Expand a specific folder and all its descendants (without touching the rest of the tree)
+  const expandSubtree = useCallback(async (rootId: string) => {
+    if (!token) return;
+    const queue: string[] = [rootId];
+    while (queue.length) {
+      const id = queue.shift()!;
+      const node = useStore.getState().tree[id];
+      if (!node) continue;
+      const isFolder = node.file.mimeType === "application/vnd.google-apps.folder";
+      if (isFolder) {
+        if (!node.loaded) await loadChildren(id);
+        expand(id);
+        queue.push(...(useStore.getState().tree[id]?.childIds ?? []));
+      }
+    }
+  }, [expand, loadChildren, token]);
+
   const visibleIds = useMemo(() => {
     if (!tree[focusRootId]) return [];
     const out: string[] = [focusRootId];
@@ -84,5 +101,5 @@ export function useDriveTree() {
     return out;
   }, [tree, expanded, focusRootId]);
 
-  return { ensureRoot, loadChildren, loadSharedDrives, expandAll, visibleIds };
+  return { ensureRoot, loadChildren, loadSharedDrives, expandAll, expandSubtree, visibleIds };
 }
