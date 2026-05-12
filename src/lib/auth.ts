@@ -1,5 +1,6 @@
 const GIS_SRC = "https://accounts.google.com/gsi/client";
 const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const INTERACTIVE_TOKEN_TIMEOUT_MS = 60000;
 
 declare global {
   interface Window {
@@ -34,20 +35,25 @@ function loadGis(): Promise<void> {
   return scriptPromise;
 }
 
-export async function requestAccessToken(): Promise<string> {
+export async function requestAccessToken(options: { prompt?: "consent" | ""; timeoutMs?: number } = {}): Promise<string> {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   if (!clientId) throw new Error("VITE_GOOGLE_CLIENT_ID is not set");
   await loadGis();
   return new Promise<string>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error("Google sign-in timed out"));
+    }, options.timeoutMs ?? INTERACTIVE_TOKEN_TIMEOUT_MS);
+
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPE,
       callback: (resp) => {
+        window.clearTimeout(timeout);
         if (resp.error || !resp.access_token) reject(new Error(resp.error ?? "no token"));
         else resolve(resp.access_token);
       },
     });
-    client.requestAccessToken({ prompt: "consent" });
+    client.requestAccessToken({ prompt: options.prompt ?? "consent" });
   });
 }
 

@@ -6,14 +6,21 @@ import PreviewPane from "./components/preview/PreviewPane";
 import ShortcutsModal from "./components/ShortcutsModal";
 import { useStore } from "./store/useStore";
 import { useDriveTree } from "./hooks/useDriveTree";
+import { requestAccessToken } from "./lib/auth";
+
+const SIGNED_IN_KEY = "graphDrive.signedIn";
 
 export default function App() {
   const token = useStore((s) => s.token);
+  const setToken = useStore((s) => s.setToken);
   const { ensureRoot } = useDriveTree();
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const darkMode = useStore((s) => s.darkMode);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [restoringSession, setRestoringSession] = useState(() => {
+    return !token && localStorage.getItem(SIGNED_IN_KEY) === "true";
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -24,12 +31,48 @@ export default function App() {
   }, [token, ensureRoot]);
 
   useEffect(() => {
+    if (token || localStorage.getItem(SIGNED_IN_KEY) !== "true") {
+      setRestoringSession(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRestoringSession(true);
+
+    (async () => {
+      try {
+        const nextToken = await requestAccessToken({ prompt: "", timeoutMs: 5000 });
+        if (!cancelled) setToken(nextToken);
+      } catch {
+        if (!cancelled) {
+          localStorage.removeItem(SIGNED_IN_KEY);
+          setToken(null);
+        }
+      } finally {
+        if (!cancelled) setRestoringSession(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setToken, token]);
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "?" && !e.ctrlKey && !e.metaKey) setShortcutsOpen((o) => !o);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  if (restoringSession) {
+    return (
+      <div className="h-full flex items-center justify-center bg-stone-50 dark:bg-stone-950 text-xs text-stone-500 dark:text-stone-400">
+        Restoring Google Drive session...
+      </div>
+    );
+  }
 
   if (!token) return <SignIn />;
   return (
