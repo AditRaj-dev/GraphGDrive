@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewKind } from "../types/drive";
 import { useStore } from "../store/useStore";
 import SelectionBadge from "./SelectionBadge";
@@ -52,10 +52,11 @@ export default function CollectionWindow({ kind, files, onClose, onFileSelect }:
   const [win, setWin] = useState<Win>({ x: 120, y: 80, width: 480, height: 360 });
   const [loadedThumbCount, setLoadedThumbCount] = useState(() => thumbnailBatchSize(files.length));
   const thumbBatchSize = thumbnailBatchSize(files.length);
+  const fileIdsKey = useMemo(() => files.map((file) => file.id).join("|"), [files]);
 
   useEffect(() => {
     setLoadedThumbCount(Math.min(thumbBatchSize, files.length));
-  }, [files, thumbBatchSize]);
+  }, [fileIdsKey, files.length, thumbBatchSize]);
 
   useEffect(() => {
     if (loadedThumbCount >= files.length) return;
