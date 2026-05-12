@@ -11,8 +11,10 @@ const LABEL: Partial<Record<PreviewKind, string>> = {
 };
 
 const THUMBNAIL_BATCH_DELAY_MS = 750;
+const IMMEDIATE_THUMBNAIL_LIMIT = 50;
 
 function thumbnailBatchSize(total: number): number {
+  if (total < IMMEDIATE_THUMBNAIL_LIMIT) return total;
   return Math.max(1, Math.ceil(total / 4));
 }
 
