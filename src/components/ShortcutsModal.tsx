@@ -14,13 +14,19 @@ const SECTIONS = [
   {
     title: "Files",
     rows: [
-      { keys: ["Click"], desc: "Select file (opens preview pane)" },
+      { keys: ["Click"], desc: "Select file and open preview" },
+      { keys: ["Ctrl", "Click"], desc: "Add or remove file from selection" },
+      { keys: ["Cmd", "Click"], desc: "Add or remove file from selection on Mac" },
+      { keys: ["Drag selected-files button"], desc: "Shake to clear the selection" },
     ],
   },
   {
-    title: "Collections (grouped files)",
+    title: "Collections",
     rows: [
-      { keys: ["Double-click"], desc: "Open collection in floating window" },
+      { keys: ["Double-click"], desc: "Open collection window" },
+      { keys: ["Ctrl", "Click"], desc: "Add or remove collection item from selection" },
+      { keys: ["Cmd", "Click"], desc: "Add or remove collection item from selection on Mac" },
+      { keys: ["Drag selected-files button"], desc: "Shake to clear the selection" },
       { keys: ["Drag title bar"], desc: "Move the window" },
       { keys: ["Drag edge / corner"], desc: "Resize the window" },
     ],
@@ -30,16 +36,20 @@ const SECTIONS = [
     rows: [
       { keys: ["Scroll"], desc: "Zoom in / out" },
       { keys: ["Click + drag"], desc: "Pan the canvas" },
-      { keys: ["Click … N more"], desc: "Show all hidden subfolders" },
+      { keys: ["Click ... N more"], desc: "Show all hidden subfolders" },
     ],
   },
   {
     title: "App",
     rows: [
       { keys: ["?"], desc: "Open / close this shortcuts panel" },
+      { keys: ["Esc"], desc: "Close this panel" },
     ],
   },
 ];
+
+const keyClass =
+  "inline-flex items-center px-1.5 py-0.5 rounded border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-800 text-[11px] font-mono text-stone-600 dark:text-stone-300 shadow-sm";
 
 export default function ShortcutsModal({ onClose }: Props) {
   useEffect(() => {
@@ -52,45 +62,41 @@ export default function ShortcutsModal({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4"
       onClick={onClose}
     >
-      {/* backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-black/40 dark:bg-black/60" />
 
       <div
-        className="relative bg-white rounded-xl shadow-2xl border border-stone-200 w-[480px] max-h-[80vh] flex flex-col overflow-hidden"
+        className="relative bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 w-[520px] max-w-full max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 shrink-0">
-          <h2 className="font-semibold text-sm text-stone-800 tracking-wide">Keyboard shortcuts</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-700 shrink-0">
+          <h2 className="font-semibold text-sm text-stone-800 dark:text-stone-100 tracking-wide">Keyboard shortcuts</h2>
           <button
             onClick={onClose}
-            className="w-6 h-6 rounded flex items-center justify-center text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors text-lg leading-none"
+            aria-label="Close shortcuts"
+            className="w-6 h-6 rounded flex items-center justify-center text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:text-stone-500 dark:hover:text-stone-200 dark:hover:bg-stone-800 transition-colors text-lg leading-none"
           >
-            ×
+            x
           </button>
         </div>
 
-        {/* body */}
         <div className="overflow-auto px-5 py-4 space-y-5">
           {SECTIONS.map((section) => (
             <div key={section.title}>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-500 mb-2">
                 {section.title}
               </p>
               <div className="space-y-1">
                 {section.rows.map((row, i) => (
                   <div key={i} className="flex items-center justify-between gap-4">
-                    <span className="text-xs text-stone-500">{row.desc}</span>
+                    <span className="text-xs text-stone-500 dark:text-stone-400">{row.desc}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {row.keys.map((k, ki) => (
                         <span key={ki} className="flex items-center gap-1">
-                          {ki > 0 && <span className="text-stone-300 text-[10px]">+</span>}
-                          <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 text-[11px] font-mono text-stone-600 shadow-sm">
-                            {k}
-                          </kbd>
+                          {ki > 0 && <span className="text-stone-300 dark:text-stone-600 text-[10px]">+</span>}
+                          <kbd className={keyClass}>{k}</kbd>
                         </span>
                       ))}
                     </div>
@@ -101,8 +107,10 @@ export default function ShortcutsModal({ onClose }: Props) {
           ))}
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-100 shrink-0">
-          <p className="text-[10px] text-stone-400">Press <kbd className="px-1 py-0.5 rounded border border-stone-200 bg-stone-50 font-mono text-[10px]">?</kbd> or <kbd className="px-1 py-0.5 rounded border border-stone-200 bg-stone-50 font-mono text-[10px]">Esc</kbd> to close</p>
+        <div className="px-5 py-3 border-t border-stone-100 dark:border-stone-700 shrink-0">
+          <p className="text-[10px] text-stone-400 dark:text-stone-500">
+            Press <kbd className={keyClass}>?</kbd> or <kbd className={keyClass}>Esc</kbd> to close
+          </p>
         </div>
       </div>
     </div>

@@ -55,8 +55,8 @@ export default function PdfPreview({ fileId }: { fileId: string }) {
 
   return (
     <div className="p-2 w-full">
-      {loading && <p className="text-stone-400 text-xs animate-pulse mb-2">Loading PDF…</p>}
-      {err && <p className="text-red-600 text-xs">{err}</p>}
+      {loading && <p className="text-stone-400 dark:text-stone-500 text-xs animate-pulse mb-2">Loading PDF...</p>}
+      {err && <p className="text-red-600 dark:text-red-400 text-xs">{err}</p>}
       <div ref={containerRef} />
     </div>
   );

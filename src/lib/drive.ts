@@ -1,6 +1,24 @@
 import type { DriveFile, SharedDrive } from "../types/drive";
 
-const FIELDS = "nextPageToken,files(id,name,mimeType,parents,iconLink,thumbnailLink,modifiedTime,size,driveId)";
+const FIELDS = "nextPageToken,files(id,name,mimeType,driveId)";
+
+/** Thumbnail served via the Drive web UI — uses the browser's live Google session. */
+export function thumbnailUrl(fileId: string, size = "w220-h165"): string {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=${size}`;
+}
+
+/** Open-in-Drive URL for any file. */
+export function driveOpenUrl(file: DriveFile): string {
+  const docMap: Record<string, string> = {
+    "application/vnd.google-apps.document":     "document",
+    "application/vnd.google-apps.spreadsheet":  "spreadsheets",
+    "application/vnd.google-apps.presentation": "presentation",
+  };
+  const seg = docMap[file.mimeType];
+  return seg
+    ? `https://docs.google.com/${seg}/d/${file.id}/edit`
+    : `https://drive.google.com/file/d/${file.id}/view`;
+}
 const DRIVE_FIELDS = "nextPageToken,drives(id,name)";
 const BASE = "https://www.googleapis.com/drive/v3";
 
@@ -23,7 +41,7 @@ export function createDriveClient(getToken: () => string): DriveClient {
     async listChildren(parentId, pageToken, options) {
       const params = new URLSearchParams({
         q: `'${parentId}' in parents and trashed=false`,
-        pageSize: "200",
+        pageSize: "1000",
         fields: FIELDS,
         orderBy: "folder,name",
         includeItemsFromAllDrives: "true",
@@ -43,7 +61,7 @@ export function createDriveClient(getToken: () => string): DriveClient {
     async listSharedFolders(pageToken) {
       const params = new URLSearchParams({
         q: "sharedWithMe=true and mimeType='application/vnd.google-apps.folder' and trashed=false",
-        pageSize: "200",
+        pageSize: "1000",
         fields: FIELDS,
         orderBy: "name",
       });

@@ -10,8 +10,14 @@ import { useDriveTree } from "./hooks/useDriveTree";
 export default function App() {
   const token = useStore((s) => s.token);
   const { ensureRoot } = useDriveTree();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useStore((s) => s.setSidebarOpen);
+  const darkMode = useStore((s) => s.darkMode);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
 
   useEffect(() => {
     if (token) ensureRoot();
@@ -28,24 +34,22 @@ export default function App() {
   if (!token) return <SignIn />;
   return (
     <>
-      <div className="h-full flex flex-col bg-stone-50 overflow-hidden">
+      <div className="h-full flex flex-col bg-stone-50 dark:bg-stone-950 overflow-hidden">
         <Toolbar
           sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           onShowShortcuts={() => setShortcutsOpen(true)}
         />
         <div
           className={`flex-1 grid min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
-            sidebarOpen ? "grid-cols-[1fr_380px]" : "grid-cols-[1fr_0px]"
-          }`}
+            sidebarOpen ? "grid-cols-[1fr_380px]" : "grid-cols-[1fr_0px]"}`}
         >
           <div className="h-full min-h-0 overflow-hidden">
             <GraphCanvas />
           </div>
           <aside
-            className={`h-full min-h-0 border-l border-stone-200 bg-white flex flex-col overflow-hidden transition-all duration-200 ${
-              sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
+            className={`h-full min-h-0 border-l border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex flex-col overflow-hidden transition-all duration-200 ${
+              sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
           >
             <PreviewPane />
           </aside>

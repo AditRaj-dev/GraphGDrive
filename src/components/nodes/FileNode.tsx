@@ -1,7 +1,13 @@
 import { Handle, Position } from "@xyflow/react";
 import type { PreviewKind } from "../../types/drive";
+import RetryingThumbnail from "../RetryingThumbnail";
 
-export type FileNodeData = { name: string; kind: PreviewKind; selected: boolean; thumbnailLink?: string };
+export type FileNodeData = {
+  name: string;
+  kind: PreviewKind;
+  selected: boolean;
+  thumbnailUrl?: string;
+};
 
 const KIND_COLORS: Record<PreviewKind, string> = {
   folder: "border-amber-300",
@@ -23,11 +29,11 @@ const hasThumbnail = (kind: PreviewKind) => kind === "image" || kind === "video"
 
 export default function FileNode({ data }: { data: unknown }) {
   const nodeData = data as FileNodeData;
-  const showThumb = hasThumbnail(nodeData.kind) && !!nodeData.thumbnailLink;
+  const showThumb = hasThumbnail(nodeData.kind) && !!nodeData.thumbnailUrl;
 
   return (
     <div className={[
-      "rounded-md border text-sm shadow-sm bg-white cursor-pointer select-none transition-shadow overflow-hidden w-[200px]",
+      "rounded-md border text-sm shadow-sm bg-white dark:bg-stone-800 cursor-pointer select-none transition-shadow overflow-hidden w-[200px]",
       showThumb ? "" : "px-3 py-2",
       KIND_COLORS[nodeData.kind],
       nodeData.selected ? "ring-2 ring-blue-500 shadow-md" : "hover:shadow-md",
@@ -36,13 +42,12 @@ export default function FileNode({ data }: { data: unknown }) {
 
       {/* Thumbnail */}
       {showThumb && (
-        <div className="relative w-full h-24 bg-stone-100 overflow-hidden">
-          <img
-            src={nodeData.thumbnailLink}
+        <div className="relative w-full h-24 bg-stone-100 dark:bg-stone-700 overflow-hidden">
+          <RetryingThumbnail
+            srcs={nodeData.thumbnailUrl ? [nodeData.thumbnailUrl] : []}
             alt={nodeData.name}
             className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => { (e.currentTarget.parentElement!).style.display = "none"; }}
+            fallback={null}
           />
           {nodeData.kind === "video" && (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -58,10 +63,10 @@ export default function FileNode({ data }: { data: unknown }) {
 
       {/* Label row */}
       <div className={["flex items-center gap-2", showThumb ? "px-2 py-1.5" : ""].join(" ")}>
-        <span className="text-[10px] font-mono uppercase tracking-wider text-stone-400 shrink-0">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-stone-400 dark:text-stone-500 shrink-0">
           {KIND_LABEL[nodeData.kind]}
         </span>
-        <span className="truncate text-stone-700 text-xs">{nodeData.name}</span>
+        <span className="truncate text-stone-700 dark:text-stone-200 text-xs">{nodeData.name}</span>
       </div>
     </div>
   );

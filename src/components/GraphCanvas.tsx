@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import {
-  ReactFlow, Background, Controls, MiniMap,
+  ReactFlow, Background, Controls, MiniMap, useReactFlow,
   type Node, type Edge, type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -14,15 +14,32 @@ import { useDriveTree } from "../hooks/useDriveTree";
 import { ROOT_ID } from "../lib/tree";
 import { layouts } from "../layouts";
 import { categorize, isFolder as isFolderMime } from "../lib/mime";
+import { thumbnailUrl } from "../lib/drive";
 import type { PreviewKind } from "../types/drive";
 
 const FOLDER_LIMIT = 20;
+
+function SmoothedMiniMap() {
+  const { setCenter, getZoom } = useReactFlow();
+  const darkMode = useStore((s) => s.darkMode);
+  return (
+    <MiniMap
+      pannable
+      zoomable
+      className="!shadow-sm !rounded-md"
+      style={darkMode ? { backgroundColor: "#1c1917", borderColor: "#44403c" } : undefined}
+      nodeColor={darkMode ? "#78716c" : "#a8a29e"}
+      maskColor={darkMode ? "rgba(0,0,0,0.4)" : "rgba(240,239,236,0.6)"}
+      onClick={(_e, pos) => setCenter(pos.x, pos.y, { duration: 300, zoom: getZoom() })}
+    />
+  );
+}
 
 const nodeTypes: NodeTypes = {
   folder: FolderNode as never,
   file: FileNode as never,
   more: MoreNode as never,
-  group: GroupNode as never,
+  kindgroup: GroupNode as never,
 };
 
 // Parse __grp__<parentId>__<kind> — parentId may contain "__"
@@ -52,6 +69,7 @@ export default function GraphCanvas() {
   const setFocusRoot = useStore((s) => s.setFocusRoot);
   const expand = useStore((s) => s.expand);
   const showAll = useStore((s) => s.showAll);
+  const darkMode = useStore((s) => s.darkMode);
   const { loadChildren, expandSubtree, visibleIds } = useDriveTree();
 
   const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);
@@ -83,7 +101,7 @@ export default function GraphCanvas() {
       .filter((n) => n !== undefined)
       .map((n) => {
         const folder = isFolderMime(n.file.mimeType);
-        const hasThumbnail = !folder && !!n.file.thumbnailLink &&
+        const hasThumbnail = !folder &&
           (n.file.mimeType.startsWith("image/") || n.file.mimeType.startsWith("video/"));
         const treeParent = parentMap.get(n.file.id) ?? null;
         return {
@@ -110,8 +128,6 @@ export default function GraphCanvas() {
     const groupLayoutNodes = groupIds.flatMap((id) => {
       const parsed = parseGroupId(id);
       if (!parsed) return [];
-      const hasThumbs = (parsed.kind === "image" || parsed.kind === "video") &&
-        (tree[parsed.parentId]?.childIds ?? []).some((cid) => tree[cid]?.file.thumbnailLink);
       return [{
         id,
         parentId: parsed.parentId,
@@ -119,7 +135,7 @@ export default function GraphCanvas() {
         isMore: false,
         isGroup: true,
         width: 200,
-        height: hasThumbs ? 104 : 52,
+        height: 104,
       }];
     });
 
@@ -144,13 +160,14 @@ export default function GraphCanvas() {
           .map((cid) => tree[cid])
           .filter((n) => n && categorize(n.file.mimeType) === kind);
         const thumbnails = groupFiles
-          .filter((n) => n!.file.thumbnailLink)
           .slice(0, 3)
-          .map((n) => n!.file.thumbnailLink!);
+          .map((n) => thumbnailUrl(n!.file.id));
         return {
           id: ln.id,
-          type: "group",
+          type: "kindgroup",
           position: pos,
+          selectable: false,
+          focusable: false,
           data: { kind, count: groupFiles.length, thumbnails },
         };
       }
@@ -169,7 +186,12 @@ export default function GraphCanvas() {
         id: ln.id,
         type: "file",
         position: pos,
-        data: { name: node.file.name, kind: categorize(node.file.mimeType), selected: selectedId === ln.id, thumbnailLink: node.file.thumbnailLink },
+        data: {
+          name: node.file.name,
+          kind: categorize(node.file.mimeType),
+          selected: selectedId === ln.id,
+          thumbnailUrl: thumbnailUrl(node.file.id),
+        },
       };
     });
 
@@ -179,11 +201,11 @@ export default function GraphCanvas() {
         id: `${n.parentId}->${n.id}`,
         source: n.parentId as string,
         target: n.id,
-        style: { stroke: "#d6d3d1", strokeWidth: 1.5 },
+        style: { stroke: darkMode ? "#57534e" : "#d6d3d1", strokeWidth: 1.5 },
       }));
 
     return { nodes, edges };
-  }, [tree, visibleIds, layoutKind, expanded, selectedId, focusRootId]);
+  }, [tree, visibleIds, layoutKind, expanded, selectedId, focusRootId, darkMode]);
 
   const onNodeClick = useCallback(async (event: MouseEvent, node: Node) => {
     // Group nodes: single-click does nothing (double-click opens window)
@@ -202,13 +224,14 @@ export default function GraphCanvas() {
         return;
       }
       if (event.shiftKey) {
-        if (!tn.loaded) await loadChildren(tn.file.id);
         setFocusRoot(tn.file.id);
         expand(tn.file.id);
+        if (!tn.loaded) loadChildren(tn.file.id); // background
         return;
       }
-      if (!tn.loaded) await loadChildren(tn.file.id);
+      // Optimistic: toggle immediately, load children in background if needed
       toggleExpand(tn.file.id);
+      if (!tn.loaded) loadChildren(tn.file.id); // background
     } else {
       select(tn.file.id);
     }
@@ -229,11 +252,11 @@ export default function GraphCanvas() {
         onNodeDoubleClick={onNodeDoubleClick}
         fitView
         proOptions={{ hideAttribution: true }}
-        className="bg-stone-100"
+        className={darkMode ? "bg-stone-900" : "bg-stone-100"}
       >
-        <Background color="#d6d3d1" gap={24} />
-        <Controls className="!shadow-sm" />
-        <MiniMap pannable zoomable className="!shadow-sm !rounded-md" />
+        <Background color={darkMode ? "#44403c" : "#d6d3d1"} gap={24} />
+        <Controls className={`!shadow-sm ${darkMode ? "[&>button]:!bg-stone-800 [&>button]:!border-stone-700 [&>button]:!text-stone-300 [&>button:hover]:!bg-stone-700" : ""}`} />
+        <SmoothedMiniMap />
       </ReactFlow>
 
       {openWindows.map(({ groupId }) => {
@@ -243,7 +266,7 @@ export default function GraphCanvas() {
         const files = (tree[parentId]?.childIds ?? [])
           .map((cid) => tree[cid])
           .filter((n) => n && categorize(n.file.mimeType) === kind)
-          .map((n) => ({ id: n!.file.id, name: n!.file.name, thumbnailLink: n!.file.thumbnailLink }));
+          .map((n) => ({ id: n!.file.id, name: n!.file.name }));
         return (
           <CollectionWindow
             key={groupId}

@@ -32,7 +32,7 @@ export default function VideoPreview({ fileId }: { fileId: string }) {
     };
   }, [fileId, token]);
 
-  if (err) return <p className="text-red-600 text-xs">{err}</p>;
-  if (!src) return <p className="text-stone-400 text-xs animate-pulse">Loading video…</p>;
+  if (err) return <p className="text-red-600 dark:text-red-400 text-xs">{err}</p>;
+  if (!src) return <p className="text-stone-400 dark:text-stone-500 text-xs animate-pulse">Loading video...</p>;
   return <video src={src} controls className="max-w-full max-h-full mx-auto block" />;
 }

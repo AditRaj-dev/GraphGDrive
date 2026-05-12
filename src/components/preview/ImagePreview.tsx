@@ -32,7 +32,7 @@ export default function ImagePreview({ fileId, name }: { fileId: string; name: s
     };
   }, [fileId, token]);
 
-  if (err) return <p className="text-red-600 text-xs">{err}</p>;
-  if (!src) return <p className="text-stone-400 text-xs animate-pulse">Loading image…</p>;
+  if (err) return <p className="text-red-600 dark:text-red-400 text-xs">{err}</p>;
+  if (!src) return <p className="text-stone-400 dark:text-stone-500 text-xs animate-pulse">Loading image...</p>;
   return <img src={src} alt={name} className="max-w-full max-h-full object-contain mx-auto block" />;
 }

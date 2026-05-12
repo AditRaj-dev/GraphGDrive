@@ -4,7 +4,6 @@ export type DriveFile = {
   mimeType: string;
   parents?: string[];
   iconLink?: string;
-  thumbnailLink?: string;
   modifiedTime?: string;
   size?: string;
   driveId?: string;

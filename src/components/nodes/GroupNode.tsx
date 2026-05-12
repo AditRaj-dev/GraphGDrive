@@ -1,5 +1,6 @@
 import { Handle, Position } from "@xyflow/react";
 import type { PreviewKind } from "../../types/drive";
+import RetryingThumbnail from "../RetryingThumbnail";
 
 export type GroupNodeData = {
   kind: PreviewKind;
@@ -13,24 +14,49 @@ const LABEL: Partial<Record<PreviewKind, string>> = {
 };
 
 const COLORS: Partial<Record<PreviewKind, string>> = {
-  image:  "border-sky-300 bg-sky-50 text-sky-700",
-  video:  "border-violet-300 bg-violet-50 text-violet-700",
-  pdf:    "border-rose-300 bg-rose-50 text-rose-700",
-  gdoc:   "border-blue-300 bg-blue-50 text-blue-700",
-  gsheet: "border-green-300 bg-green-50 text-green-700",
-  gslide: "border-orange-300 bg-orange-50 text-orange-700",
-  other:  "border-stone-300 bg-stone-50 text-stone-600",
+  image:  "border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300",
+  video:  "border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
+  pdf:    "border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300",
+  gdoc:   "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
+  gsheet: "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
+  gslide: "border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300",
+  other:  "border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-400",
 };
 
 const BADGE: Partial<Record<PreviewKind, string>> = {
-  image:  "bg-sky-100 text-sky-600",
-  video:  "bg-violet-100 text-violet-600",
-  pdf:    "bg-rose-100 text-rose-600",
-  gdoc:   "bg-blue-100 text-blue-600",
-  gsheet: "bg-green-100 text-green-600",
-  gslide: "bg-orange-100 text-orange-600",
-  other:  "bg-stone-200 text-stone-500",
+  image:  "bg-sky-100 dark:bg-sky-800/50 text-sky-600 dark:text-sky-300",
+  video:  "bg-violet-100 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300",
+  pdf:    "bg-rose-100 dark:bg-rose-800/50 text-rose-600 dark:text-rose-300",
+  gdoc:   "bg-blue-100 dark:bg-blue-800/50 text-blue-600 dark:text-blue-300",
+  gsheet: "bg-green-100 dark:bg-green-800/50 text-green-600 dark:text-green-300",
+  gslide: "bg-orange-100 dark:bg-orange-800/50 text-orange-600 dark:text-orange-300",
+  other:  "bg-stone-200 dark:bg-stone-700 text-stone-500 dark:text-stone-400",
 };
+
+function ThumbSlot({ source }: { source: string }) {
+  return (
+    <RetryingThumbnail
+      srcs={[source]}
+      alt=""
+      className="flex-1 object-cover min-w-0"
+      fallback={<div className="flex-1 bg-current opacity-5" />}
+    />
+  );
+}
+
+function ThumbStrip({ thumbnails }: { thumbnails: string[] }) {
+  const slots = thumbnails.slice(0, 3);
+  const placeholders = Math.max(0, 3 - slots.length);
+
+  return (
+    <div className="flex h-14 overflow-hidden border-b border-current/10">
+      {slots.map((source, i) => <ThumbSlot key={i} source={source} />)}
+      {Array.from({ length: placeholders }).map((_, i) => (
+        <div key={`ph-${i}`} className="flex-1 bg-current opacity-5" />
+      ))}
+    </div>
+  );
+}
 
 export default function GroupNode({ data }: { data: unknown }) {
   const { kind, count, thumbnails } = data as GroupNodeData;
@@ -44,23 +70,7 @@ export default function GroupNode({ data }: { data: unknown }) {
       <Handle type="target" position={Position.Left} className="!bg-stone-400 !border-stone-500" />
 
       {/* Thumbnail strip — 3 side-by-side images */}
-      {hasThumbs && (
-        <div className="flex h-14 overflow-hidden border-b border-current border-opacity-10">
-          {thumbnails.slice(0, 3).map((url, i) => (
-            <img
-              key={i}
-              src={url}
-              alt=""
-              className="flex-1 object-cover min-w-0"
-              loading="lazy"
-            />
-          ))}
-          {/* grey placeholder slots if fewer than 3 */}
-          {Array.from({ length: Math.max(0, 3 - thumbnails.length) }).map((_, i) => (
-            <div key={`ph-${i}`} className="flex-1 bg-current opacity-5" />
-          ))}
-        </div>
-      )}
+      {hasThumbs && <ThumbStrip thumbnails={thumbnails} />}
 
       {/* Label row */}
       <div className="flex items-center gap-2 px-3 py-2">

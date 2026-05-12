@@ -3,6 +3,11 @@ import { createDriveClient } from "../lib/drive";
 import { mergeChildren, mergeSharedDrives, mergeSharedFolders, ROOT_ID } from "../lib/tree";
 import { categorize } from "../lib/mime";
 import { useStore } from "../store/useStore";
+import type { DriveFile } from "../types/drive";
+
+const FOLDER_MIME = "application/vnd.google-apps.folder";
+// Max parallel Drive API requests — stays well inside quota limits
+const PARALLEL = 6;
 
 export function useDriveTree() {
   const token = useStore((s) => s.token);
@@ -18,21 +23,54 @@ export function useDriveTree() {
     [token]
   );
 
-  const loadChildren = useCallback(async (parentId: string) => {
-    if (!token) return;
-    let pageToken: string | undefined;
-    let acc = useStore.getState().tree;
-    const parent = acc[parentId];
+  // Fetch all pages for one folder and return the file list (no store update)
+  const fetchFolder = useCallback(async (parentId: string): Promise<{ files: DriveFile[]; groupLooseFiles: boolean }> => {
+    const parent = useStore.getState().tree[parentId];
     const driveId = parent?.file.driveId;
     const apiParentId = parent?.file.virtualKind === "sharedDrive" && driveId ? driveId : parentId;
     const groupLooseFiles = parentId === ROOT_ID || parent?.file.virtualKind === "sharedDrive";
+    let pageToken: string | undefined;
+    const files: DriveFile[] = [];
     do {
       const res = await client.listChildren(apiParentId, pageToken, driveId ? { driveId } : undefined);
-      acc = mergeChildren(acc, parentId, res.files, { groupLooseFiles });
+      files.push(...res.files);
       pageToken = res.nextPageToken;
     } while (pageToken);
+    return { files, groupLooseFiles };
+  }, [client]);
+
+  // Load one folder and immediately update the store (used for single-click expand)
+  const loadChildren = useCallback(async (parentId: string) => {
+    if (!token) return;
+    const { files, groupLooseFiles } = await fetchFolder(parentId);
+    // Always read latest tree before merging to avoid stale closure
+    const acc = mergeChildren(useStore.getState().tree, parentId, files, { groupLooseFiles });
     setTree(acc);
-  }, [client, setTree, token]);
+  }, [fetchFolder, setTree, token]);
+
+  // Load multiple folders in parallel, merge all results in one store write
+  const loadChildrenBatch = useCallback(async (parentIds: string[]) => {
+    if (!token || parentIds.length === 0) return;
+    // Fetch in parallel, chunked to respect PARALLEL limit
+    const results: { parentId: string; files: DriveFile[]; groupLooseFiles: boolean }[] = [];
+    for (let i = 0; i < parentIds.length; i += PARALLEL) {
+      const chunk = parentIds.slice(i, i + PARALLEL);
+      const fetched = await Promise.all(
+        chunk.map(async (parentId) => {
+          const { files, groupLooseFiles } = await fetchFolder(parentId);
+          return { parentId, files, groupLooseFiles };
+        })
+      );
+      results.push(...fetched);
+      // Merge and commit after each chunk so the graph updates progressively
+      let acc = useStore.getState().tree;
+      for (const { parentId, files, groupLooseFiles } of fetched) {
+        acc = mergeChildren(acc, parentId, files, { groupLooseFiles });
+      }
+      setTree(acc);
+    }
+    return results;
+  }, [fetchFolder, setTree, token]);
 
   const loadSharedDrives = useCallback(async () => {
     if (!token) return;
@@ -68,34 +106,40 @@ export function useDriveTree() {
     await ensureRoot();
     const queue: string[] = [...(useStore.getState().tree[ROOT_ID]?.childIds ?? [])];
     while (queue.length) {
-      const id = queue.shift()!;
-      const node = useStore.getState().tree[id];
-      if (!node) continue;
-      const isFolder = node.file.mimeType === "application/vnd.google-apps.folder";
-      if (isFolder) {
-        if (!node.loaded) await loadChildren(id);
-        expand(id);
-      }
-      queue.push(...(useStore.getState().tree[id]?.childIds ?? []));
-    }
-  }, [ensureRoot, expand, loadChildren, token]);
-
-  // Expand a specific folder and all its descendants (without touching the rest of the tree)
-  const expandSubtree = useCallback(async (rootId: string) => {
-    if (!token) return;
-    const queue: string[] = [rootId];
-    while (queue.length) {
-      const id = queue.shift()!;
-      const node = useStore.getState().tree[id];
-      if (!node) continue;
-      const isFolder = node.file.mimeType === "application/vnd.google-apps.folder";
-      if (isFolder) {
-        if (!node.loaded) await loadChildren(id);
+      const level = queue.splice(0); // take all items at current level
+      const toLoad = level.filter((id) => {
+        const n = useStore.getState().tree[id];
+        return n?.file.mimeType === FOLDER_MIME && !n.loaded;
+      });
+      if (toLoad.length) await loadChildrenBatch(toLoad);
+      for (const id of level) {
+        const node = useStore.getState().tree[id];
+        if (!node || node.file.mimeType !== FOLDER_MIME) continue;
         expand(id);
         queue.push(...(useStore.getState().tree[id]?.childIds ?? []));
       }
     }
-  }, [expand, loadChildren, token]);
+  }, [ensureRoot, expand, loadChildrenBatch, token]);
+
+  // Expand a specific folder and all its descendants in parallel level-by-level
+  const expandSubtree = useCallback(async (rootId: string) => {
+    if (!token) return;
+    let level = [rootId];
+    while (level.length > 0) {
+      const toLoad = level.filter((id) => !useStore.getState().tree[id]?.loaded);
+      if (toLoad.length) await loadChildrenBatch(toLoad);
+      const nextLevel: string[] = [];
+      for (const id of level) {
+        expand(id);
+        for (const childId of useStore.getState().tree[id]?.childIds ?? []) {
+          if (useStore.getState().tree[childId]?.file.mimeType === FOLDER_MIME) {
+            nextLevel.push(childId);
+          }
+        }
+      }
+      level = nextLevel;
+    }
+  }, [expand, loadChildrenBatch, token]);
 
   const FOLDER_LIMIT = 20;
 
@@ -106,22 +150,19 @@ export function useDriveTree() {
     const walk = (id: string) => {
       const node = tree[id];
       if (!node) return;
-      if (node.file.mimeType !== "application/vnd.google-apps.folder") return;
+      if (node.file.mimeType !== FOLDER_MIME) return;
       if (!expanded.has(id)) return;
 
       const children = node.childIds;
       const showAll = showAllIds.has(id);
 
-      // Split into subfolders and files
-      const subfolders = children.filter((c) => tree[c]?.file.mimeType === "application/vnd.google-apps.folder");
-      const files = children.filter((c) => tree[c] && tree[c]!.file.mimeType !== "application/vnd.google-apps.folder");
+      const subfolders = children.filter((c) => tree[c]?.file.mimeType === FOLDER_MIME);
+      const files = children.filter((c) => tree[c] && tree[c]!.file.mimeType !== FOLDER_MIME);
 
-      // Cap subfolders (files are grouped, so they don't inflate node count)
       const visibleFolders = showAll ? subfolders : subfolders.slice(0, FOLDER_LIMIT);
       for (const fid of visibleFolders) { out.push(fid); walk(fid); }
       if (!showAll && subfolders.length > FOLDER_LIMIT) out.push(`__more__${id}`);
 
-      // Group files by kind → one sentinel per kind, or expand if toggled
       const byKind = new Map<string, string[]>();
       for (const fid of files) {
         const kind = categorize(tree[fid]!.file.mimeType);

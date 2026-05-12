@@ -1,12 +1,22 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PreviewKind } from "../types/drive";
+import { useStore } from "../store/useStore";
+import SelectionBadge from "./SelectionBadge";
+import RetryingThumbnail from "./RetryingThumbnail";
+import { thumbnailUrl } from "../lib/drive";
 
 const LABEL: Partial<Record<PreviewKind, string>> = {
   image: "Photos", video: "Videos", pdf: "PDFs",
   gdoc: "Docs", gsheet: "Sheets", gslide: "Slides", other: "Files",
 };
 
-type FileEntry = { id: string; name: string; thumbnailLink?: string };
+const THUMBNAIL_BATCH_DELAY_MS = 750;
+
+function thumbnailBatchSize(total: number): number {
+  return Math.max(1, Math.ceil(total / 4));
+}
+
+type FileEntry = { id: string; name: string };
 type Win = { x: number; y: number; width: number; height: number };
 
 type Props = {
@@ -16,28 +26,46 @@ type Props = {
   onFileSelect(id: string): void;
 };
 
-function Thumb({ src, name }: { src?: string; name: string }) {
-  const [failed, setFailed] = useState(false);
+function Thumb({ fileId, srcs, name, kind }: { fileId: string; srcs: string[]; name: string; kind: PreviewKind }) {
   const ext = name.split(".").pop()?.toUpperCase().slice(0, 4) ?? "FILE";
-  if (!src || failed) {
-    return (
-      <div className="w-full h-20 bg-stone-100 flex items-center justify-center text-stone-400 text-xs font-medium">
+  const fallback = (
+      <div className="w-full h-20 bg-stone-100 dark:bg-stone-700 flex items-center justify-center text-stone-400 dark:text-stone-500 text-xs font-medium">
         {ext}
       </div>
-    );
-  }
+  );
+
   return (
-    <img
-      src={src}
+    <RetryingThumbnail
+      srcs={srcs}
       alt={name}
       className="w-full h-20 object-cover"
-      onError={() => setFailed(true)}
+      fallback={fallback}
+      fileId={fileId}
+      authenticatedFallback={kind === "image"}
     />
   );
 }
 
 export default function CollectionWindow({ kind, files, onClose, onFileSelect }: Props) {
+  const selectedIds = useStore((s) => s.selectedIds);
+  const toggleSelectedId = useStore((s) => s.toggleSelectedId);
   const [win, setWin] = useState<Win>({ x: 120, y: 80, width: 480, height: 360 });
+  const [loadedThumbCount, setLoadedThumbCount] = useState(() => thumbnailBatchSize(files.length));
+  const thumbBatchSize = thumbnailBatchSize(files.length);
+
+  useEffect(() => {
+    setLoadedThumbCount(Math.min(thumbBatchSize, files.length));
+  }, [files, thumbBatchSize]);
+
+  useEffect(() => {
+    if (loadedThumbCount >= files.length) return;
+
+    const timer = window.setTimeout(() => {
+      setLoadedThumbCount((count) => Math.min(count + thumbBatchSize, files.length));
+    }, THUMBNAIL_BATCH_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [files.length, loadedThumbCount, thumbBatchSize]);
 
   // --- drag ---
   const dragStart = useRef<{ mx: number; my: number; wx: number; wy: number } | null>(null);
@@ -90,16 +118,16 @@ export default function CollectionWindow({ kind, files, onClose, onFileSelect }:
 
   return (
     <div
-      className="fixed z-50 bg-white rounded-xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden select-none"
+      className="fixed z-50 bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 flex flex-col overflow-hidden select-none"
       style={{ left: win.x, top: win.y, width: win.width, height: win.height }}
     >
       {/* Title bar */}
       <div
-        className="flex items-center gap-2 px-3 py-2 bg-stone-50 border-b border-stone-200 cursor-move shrink-0"
+        className="flex items-center gap-2 px-3 py-2 bg-stone-50 dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700 cursor-move shrink-0"
         onMouseDown={onTitleMouseDown}
       >
-        <span className="font-semibold text-sm text-stone-700">{label}</span>
-        <span className="text-xs text-stone-400 tabular-nums">{files.length}</span>
+        <span className="font-semibold text-sm text-stone-700 dark:text-stone-200">{label}</span>
+        <span className="text-xs text-stone-400 dark:text-stone-500 tabular-nums">{files.length}</span>
         <button
           className="ml-auto w-5 h-5 rounded-full bg-rose-400 hover:bg-rose-500 flex items-center justify-center text-white text-[11px] leading-none transition-colors"
           onClick={onClose}
@@ -111,16 +139,39 @@ export default function CollectionWindow({ kind, files, onClose, onFileSelect }:
       {/* File grid */}
       <div className="flex-1 overflow-auto p-3">
         <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
-          {files.map((f) => (
-            <div
-              key={f.id}
-              className="rounded-lg border border-stone-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
-              onClick={() => onFileSelect(f.id)}
-            >
-              <Thumb src={f.thumbnailLink} name={f.name} />
-              <p className="text-[10px] text-stone-600 px-1.5 py-1 truncate">{f.name}</p>
-            </div>
-          ))}
+          {files.map((f, index) => {
+            const inSelection = selectedIds.has(f.id);
+            const shouldLoadThumb = index < loadedThumbCount;
+            return (
+              <div
+                key={f.id}
+                className={[
+                  "relative rounded-lg border overflow-hidden cursor-pointer transition-all",
+                  inSelection
+                    ? "border-blue-500 ring-2 ring-blue-400 shadow-md"
+                    : "border-stone-200 dark:border-stone-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md",
+                ].join(" ")}
+                onClick={(e) => {
+                  if (e.ctrlKey || e.metaKey) {
+                    toggleSelectedId(f.id);
+                  } else {
+                    onFileSelect(f.id);
+                  }
+                }}
+              >
+                <Thumb
+                  fileId={f.id}
+                  srcs={shouldLoadThumb ? [thumbnailUrl(f.id)] : []}
+                  name={f.name}
+                  kind={kind}
+                />
+                <p className="text-[10px] text-stone-600 dark:text-stone-400 px-1.5 py-1 truncate">{f.name}</p>
+                {inSelection && (
+                  <SelectionBadge className="absolute top-1 right-1" onShake={() => toggleSelectedId(f.id)} />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
